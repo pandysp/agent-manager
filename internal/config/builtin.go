@@ -655,4 +655,29 @@ rules = [
   { state = "waiting", pattern = "(?m)^ /sessions[ \\t]*\\n(?:[^\\n]*\\n)*? ↑↓ to navigate · ↵ to select · ctrl\\+p to preview · \\+ to view all controls[ \\t]*(?:\\n(?:[^─›\\n][^\\n]*)?)*\\z" },
   { state = "working", pattern = "(?m)^›[ \\t]+Kiro is working · [^\\n]*(?:\\n(?:[^›\\n][^\\n]*)?)*\\z" },
 ]
+# pi-durable (pi session 8fc23933, 2026-11-10): the classic pi screen (fan56/pi-durable-tui) as a live window onto
+# a Pi Durable conversation owned by Buzz 1.0's Pi plugin. The screen is pi's own, so the status keys are copied from
+# [tools.pi]. The launcher takes only --session-id or --resume; the first instruction is pasted in afterwards.
+[tools.pi-durable]
+command = "pi-durable-term"
+session_report = "none"
+prompt_mode = "send"
+session_id_flag = "--session-id"
+resume_by_id_command = "pi-durable-term --resume {id}"
+default_status = "finished"
+input_prefix = "^"
+activity_cutoff = "(?ms)\\A.*^(?:─+[ \\t]+[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏][ \\t]+[^\\n]*?[ \\t]+)?─{8,}[ \\t]*$"
+chrome_line = "^[ \\t]*─{8,}[ \\t]*$"
+rules = [
+  { state = "idle", pattern = "(?ms)^[ \\t]*Resumed session[ \\t]*\\n[ \\t]*\\n─{8,}[ \\t]*\\n(?:[ \\t]*\\n)*─{8,}[ \\t]*(?:\\n[^\\n]*){2,5}[ \\t]*(?:\\n[ \\t]*)*\\z" },
+  { state = "waiting", pattern = "(?ms)^[ \\t]*Project trust[ \\t]*\\n.*\\n─{8,}[ \\t]*(?:\\n[ \\t]*)*\\z" },
+  { state = "errored", pattern = "(?ms)^[ \\t]*Error:[^\\n]*(?:\\n[ \\t]+[^ \\t\\n][^\\n]*){0,8}\\n[ \\t]*\\n─{8,}[ \\t]*\\n(?:[ \\t]*\\n)*─{8,}[ \\t]*(?:\\n[^\\n]*){2,5}[ \\t]*(?:\\n[ \\t]*)*\\z" },
+  { state = "errored", pattern = "(?ms)^[ \\t]*[^\\n]*rate limit reached[^\\n]*\\n[ \\t]*\\n─{8,}[ \\t]*\\n(?:[ \\t]*\\n)*─{8,}[ \\t]*(?:\\n[^\\n]*){2,5}[ \\t]*(?:\\n[ \\t]*)*\\z" },
+  { state = "waiting", pattern = "(?ms)\\?[ \\t]*\\n[ \\t]*\\n─{8,}[ \\t]*\\n(?:[ \\t]*\\n)*─{8,}[ \\t]*(?:\\n[^\\n]*){2,5}[ \\t]*(?:\\n[ \\t]*)*\\z" },
+  # The spinner sits on a line of its own above the composer, or since pi
+  # 0.85 inside the composer's top border ("── ⠹ Working ───"); custom
+  # editors keep the standalone shape, so both are live. The composer may
+  # hold a draft typed mid-turn.
+  { state = "working", pattern = "(?ms)^[ \\t]*(?:[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏][ \\t]+(?:Working|Running|Retrying|Compacting context|Auto-compacting|Context overflow detected, Auto-compacting|Summarizing branch)\\b[^\\n]*\\n[ \\t]*\\n─{8,}[ \\t]*|─+[ \\t]+[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏][ \\t]+(?:Working|Running|Retrying|Compacting context|Auto-compacting|Context overflow detected, Auto-compacting|Summarizing branch)\\b[^\\n]*)\\n(?:(?:[^─\\n][^\\n]*)?\\n)*─{8,}[ \\t]*(?:\\n[^\\n]*){2,5}[ \\t]*(?:\\n[ \\t]*)*\\z" },
+]
 `
