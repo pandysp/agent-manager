@@ -50,3 +50,15 @@ func TestModelListScrollsBackToTheDefaultRow(t *testing.T) {
 		}
 	}
 }
+
+// A list two rows tall cannot hold the default row, the heading and the
+// first model, so it keeps the highlighted model on screen instead.
+func TestShortModelListKeepsTheHighlightOnScreen(t *testing.T) {
+	h := newFakeChoiceHost()
+	ch := NewChoice(h, "claude")
+	ch.OpenFilter(h, "claude")
+	lines, entries := ch.ViewSuggestions(h, "claude", 0, 60, 2, Styles{})
+	if !slices.Contains(entries, ch.sugg.index) {
+		t.Fatalf("the highlighted entry %d is off screen: entries %v, lines %q", ch.sugg.index, entries, lines)
+	}
+}

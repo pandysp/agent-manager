@@ -150,11 +150,12 @@ func (ch *Choice) ViewSuggestions(h ChoiceHost, toolName string, indent, width, 
 }
 
 // scrollToShow returns to the top on the first model, so the default row
-// and the headings above it show.
+// and the headings above it show, unless the list is too short to hold
+// them and the highlight together.
 func scrollToShow(offset, highlight, total, visible, first int) int {
 	switch {
 	case highlight < 0:
-	case highlight <= first:
+	case highlight <= first && highlight < visible:
 		offset = 0
 	case highlight < offset:
 		offset = highlight
