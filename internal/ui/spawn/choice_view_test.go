@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	catalog "github.com/YoanWai/agent-manager/internal/catalog/value"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -19,6 +20,31 @@ func TestModelListNamesTheDefaultRowAboveItsHeadings(t *testing.T) {
 		t.Fatalf("entries = %v", entries)
 	}
 	for i, want := range []string{"claude's default", "recent", "opus", "from claude · 3 models", "default", "haiku"} {
+		if got := ansi.Strip(lines[i]); !strings.Contains(got, want) {
+			t.Fatalf("line %d = %q, want %q", i, got, want)
+		}
+	}
+}
+
+// Stepping back up a scrolled list to the first model brings the default
+// row and the headings above it back.
+func TestModelListScrollsBackToTheDefaultRow(t *testing.T) {
+	h := newFakeChoiceHost()
+	h.answers["claude"] = &Answer{Loaded: true, Cat: catalog.Catalog{Models: []catalog.Model{
+		{ID: "opus"}, {ID: "sonnet"}, {ID: "haiku"}, {ID: "fable"}, {ID: "luna"},
+	}}}
+	h.settings[recentModelsKey("claude")] = `["opus"]`
+	ch := NewChoice(h, "claude")
+	ch.OpenFilter(h, "claude")
+	for range 4 {
+		ch.StepList(h, "claude", 1)
+		ch.ViewSuggestions(h, "claude", 0, 60, 3, Styles{})
+	}
+	for range 4 {
+		ch.StepList(h, "claude", -1)
+	}
+	lines, _ := ch.ViewSuggestions(h, "claude", 0, 60, 3, Styles{})
+	for i, want := range []string{"claude's default", "recent", "opus"} {
 		if got := ansi.Strip(lines[i]); !strings.Contains(got, want) {
 			t.Fatalf("line %d = %q, want %q", i, got, want)
 		}
