@@ -122,8 +122,8 @@ func TestFormSpawnsOnTheChoice(t *testing.T) {
 	setFormTool(m, slices.Index(formTools(m), "claude"))
 	m.form().RestartChoice(m.spawnHost())
 	list := m.form().Choice().Suggestions(m.spawnHost(), "claude")
-	if len(list) == 0 || list[0] != "opus" {
-		t.Fatalf("the last pick should lead the list: %+v", list)
+	if len(list) < 2 || list[1] != "opus" {
+		t.Fatalf("the last pick should lead the models: %+v", list)
 	}
 }
 
@@ -299,7 +299,7 @@ func TestQuickPromptClicks(t *testing.T) {
 	if m.quick().Picking() != uiquick.PickModel {
 		t.Fatal("the model stretch should open the list")
 	}
-	click(uiquick.ClickEntry, 1)
+	click(uiquick.ClickEntry, 2)
 	if m.quick().Picking() != uiquick.PickNone || m.quick().Choice().Model() != "opus" {
 		t.Fatalf("picking %d model %q", m.quick().Picking(), m.quick().Choice().Model())
 	}

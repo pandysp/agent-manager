@@ -104,10 +104,10 @@ func (ch *Choice) ViewSuggestions(h ChoiceHost, toolName string, indent, width, 
 	highlight := -1
 	state, _ := choiceAnswer(h, toolName)
 	for i, entry := range list {
-		if i == 0 && entry.recent {
+		if entry.recent && (i == 0 || !list[i-1].recent) {
 			heading("recent")
 		}
-		if !entry.recent && (i == 0 || list[i-1].recent) {
+		if !entry.recent && !entry.isDefault() && (i == 0 || list[i-1].recent || list[i-1].isDefault()) {
 			source := fmt.Sprintf("from %s · %d models", toolName, len(ch.models(h, toolName)))
 			if state.Err != nil {
 				source += " · refresh failed: " + state.Err.Error()
@@ -120,7 +120,11 @@ func (ch *Choice) ViewSuggestions(h ChoiceHost, toolName string, indent, width, 
 			style = lipgloss.NewStyle().Foreground(st.Accent2).Bold(true)
 			highlight = len(rows)
 		}
-		row := marker + style.Render(entry.model.ID)
+		name := entry.model.ID
+		if entry.isDefault() {
+			name = ch.filter.Placeholder
+		}
+		row := marker + style.Render(name)
 		if detail := modelDetail(entry.model); detail != "" {
 			row += "  " + st.Subtle.Render(detail)
 		}
