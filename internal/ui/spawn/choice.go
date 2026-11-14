@@ -100,7 +100,7 @@ type modelSuggest struct {
 func NewChoice(h ChoiceHost, toolName string) Choice {
 	filter := textinput.New()
 	filter.CharLimit = 200
-	filter.Placeholder = toolName + "'s default"
+	filter.Placeholder = "cli default"
 	typed := textinput.New()
 	typed.CharLimit = 40
 	typed.Placeholder = "default"

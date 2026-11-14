@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// The default row carries the CLI's name and sits above both headings.
+// The default row reads cli default and sits above both headings.
 func TestModelListNamesTheDefaultRowAboveItsHeadings(t *testing.T) {
 	h := newFakeChoiceHost()
 	h.settings[recentModelsKey("claude")] = `["opus"]`
@@ -19,7 +19,7 @@ func TestModelListNamesTheDefaultRowAboveItsHeadings(t *testing.T) {
 	if !slices.Equal(entries, []int{0, -1, 1, -1, 2, 3}) {
 		t.Fatalf("entries = %v", entries)
 	}
-	for i, want := range []string{"claude's default", "recent", "opus", "from claude · 3 models", "default", "haiku"} {
+	for i, want := range []string{"cli default", "recent", "opus", "from claude · 3 models", "default", "haiku"} {
 		if got := ansi.Strip(lines[i]); !strings.Contains(got, want) {
 			t.Fatalf("line %d = %q, want %q", i, got, want)
 		}
@@ -44,7 +44,7 @@ func TestModelListScrollsBackToTheDefaultRow(t *testing.T) {
 		ch.StepList(h, "claude", -1)
 	}
 	lines, _ := ch.ViewSuggestions(h, "claude", 0, 60, 3, Styles{})
-	for i, want := range []string{"claude's default", "recent", "opus"} {
+	for i, want := range []string{"cli default", "recent", "opus"} {
 		if got := ansi.Strip(lines[i]); !strings.Contains(got, want) {
 			t.Fatalf("line %d = %q, want %q", i, got, want)
 		}

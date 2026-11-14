@@ -435,7 +435,7 @@ func TestQuickModelSheetFitsTheColumn(t *testing.T) {
 		t.Fatal("80 columns should give the split")
 	}
 	view := ansi.Strip(preparedView(m))
-	for _, want := range []string{"model for work", "claude's default", "⎇ "} {
+	for _, want := range []string{"model for work", "cli default", "⎇ "} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("%q fell off the column:\n%s", want, view)
 		}
