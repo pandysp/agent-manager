@@ -34,7 +34,7 @@ yay -S agent-manager-bin
 ## mise
 
 ```bash
-mise use -g ubi:wainmann/agent-manager
+mise use -g github:wainmann/agent-manager
 ```
 
 Reads the GitHub release directly, so it needs no registry entry. Install tmux and git with your own package manager.
@@ -45,7 +45,7 @@ Reads the GitHub release directly, so it needs no registry entry. Install tmux a
 go install github.com/YoanWai/agent-manager@latest
 ```
 
-Requires Go 1.27.3+, tmux 3.1+, and git; installs to `$(go env GOPATH)/bin`.
+Requires Go 1.27.4+, tmux 3.1+, and git; installs to `$(go env GOPATH)/bin`.
 
 ## Prebuilt binaries
 
@@ -217,7 +217,8 @@ brew upgrade --cask yoanwai/tap/agent-manager                                   
 scoop update                                                                              # Scoop, after closing agent-manager
 scoop update agent-manager                                                                # Scoop, second step
 curl -fsSL -o install.sh https://raw.githubusercontent.com/wainmann/agent-manager/main/install.sh && sh install.sh
-mise upgrade --bump ubi:wainmann/agent-manager                                            # mise
+mise upgrade --bump github:wainmann/agent-manager                                         # mise
+mise upgrade --bump ubi:wainmann/agent-manager                                            # mise, earlier installs
 mise upgrade --bump ubi:YoanWai/agent-manager                                             # mise, earlier installs
 go install github.com/YoanWai/agent-manager@latest                                        # Go
 ```

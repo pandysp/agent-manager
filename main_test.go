@@ -179,6 +179,7 @@ func TestMainNonInteractiveStartReportsHelpFailures(t *testing.T) {
 		main()
 		return
 	}
+	t.Setenv("AGENT_MANAGER_CONFIG_DIR", "")
 	t.Run("config dir", func(t *testing.T) {
 		home := t.TempDir()
 		env, want := nonInteractiveConfigDirFailure(home)
@@ -193,7 +194,8 @@ func TestMainNonInteractiveStartReportsHelpFailures(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(configDir, "state.db"), []byte("not a database"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		assertNonInteractiveFailure(t, env, "not a database")
+		// An empty AGENT_MANAGER_CONFIG_DIR makes the child test binary plant its own config dir.
+		assertNonInteractiveFailure(t, append(env, "AGENT_MANAGER_CONFIG_DIR", configDir), "not a database")
 	})
 }
 
@@ -445,7 +447,7 @@ func TestResolveVersion(t *testing.T) {
 	}{
 		{"ldflags win", "0.11.0", "v0.11.0", true, "0.11.0"},
 		{"ldflags win over missing info", "0.11.0", "", false, "0.11.0"},
-		{"git describe stamp", "v0.11.0-3-g1656b508-dirty", "v0.11.1-0.20260730153639-1656b508abcd+dirty", true, "v0.11.0-3-g1656b508-dirty"},
+		{"git describe stamp", "v0.11.0-3-g1656b508-dirty", "v0.11.1-0.20260730153639-1656b508abcd+dirty", true, "0.11.0-3-g1656b508-dirty"},
 		{"go install at a tag", devVersion, "v0.11.0", true, "0.11.0"},
 		{"pseudo-version", devVersion, "v0.10.6-0.20260730153639-3b5b8a9a5649", true, devVersion},
 		{"go run", devVersion, "(devel)", true, devVersion},
