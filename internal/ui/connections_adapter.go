@@ -169,7 +169,11 @@ type remoteMoveRoot struct {
 func (r remoteMoveRoot) PlaceMove(_ uidialogs.Move, picker *spawn.Picker) tea.Cmd {
 	r.Pop()
 	group := picker.GroupPath()
-	if group == r.row.Group {
+	current := r.row.Group
+	if now, ok := r.ssh.Row(uirail.Selection{Kind: uirail.SessionRow, SessionID: r.row.Ref.ID, Host: r.row.Host}); ok {
+		current = now.Group
+	}
+	if group == current {
 		return nil
 	}
 	request := remoteCall(r.row.Host, r.row.Ref, r.row.Name)
