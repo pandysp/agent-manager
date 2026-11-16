@@ -119,8 +119,7 @@ func TestRemoteActionsAlreadyInPlaceDoNothing(t *testing.T) {
 
 func TestUnsupportedRemoteActionsAreRefusedWithoutIO(t *testing.T) {
 	refused := map[uirail.ActionKind]string{
-		uirail.RenameAction: "rename", uirail.MoveToGroup: "move",
-		uirail.Restart: "restart", uirail.Fork: "fork", uirail.OpenReview: "review",
+		uirail.RenameAction: "rename", uirail.Restart: "restart", uirail.Fork: "fork", uirail.OpenReview: "review",
 		uirail.OpenEditor: "the editor", uirail.CopyReply: "copy reply", uirail.MarkIdle: "mark idle",
 		uirail.CancelEnd: "cancel end", uirail.KillAll: "kill all",
 		uirail.ReviveAll: "revive all",
@@ -147,8 +146,81 @@ func TestUnsupportedRemoteActionsAreRefusedWithoutIO(t *testing.T) {
 	if _, cmd := m.runRailIntent(uirail.Intent{Kind: uirail.Delete, Target: boxGroup}); cmd != nil || confirmOpen(m) || m.errBar.text != "deleting a group isn't available on SSH connections yet" {
 		t.Fatalf("delete on a remote group: status %q", m.errBar.text)
 	}
+	for target, want := range map[uirail.Selection]string{
+		boxRow:           "box is a connection, not a group to move",
+		boxGroup:         "moving a group isn't available on SSH connections yet",
+		boxSession("t1"): "moving or nesting a terminal isn't available on SSH connections yet",
+	} {
+		m.clearErr()
+		if _, cmd := m.runRailIntent(uirail.Intent{Kind: uirail.MoveToGroup, Target: target}); cmd != nil || moveOpen(m) || m.errBar.text != want {
+			t.Fatalf("move on %+v: status %q, want %q", target, m.errBar.text, want)
+		}
+	}
 	if calls := fake.taken(); len(calls) != 0 {
 		t.Fatalf("calls = %q, want none", calls)
+	}
+}
+
+// A move on a remote agent picks from that host's groups alone, which may
+// take it, and the host files it there.
+func TestRemoteMovePicksAmongTheHostsGroups(t *testing.T) {
+	fake := &fakeSSH{}
+	m := listedModel(t, fake)
+	m.workspace.groups = []string{"local-only"}
+	fake.snapshot.Groups = append(fake.snapshot.Groups, sessioncmd.Group{Path: "ops"}, sessioncmd.Group{Path: "ops/db"},
+		sessioncmd.Group{Path: "shelf", Archived: true}, sessioncmd.Group{Path: "shelf/inner"})
+	fake.snapshot.Sessions = append(fake.snapshot.Sessions,
+		sessioncmd.Session{ID: "s4", Name: "stored", Tool: "claude", Group: "shelf/inner", Status: "dead", Archived: true})
+	setHost(m, "box", uilink.Facts(remote.HostState{OK: true, Snapshot: fake.snapshot}))
+	picked := func() (paths []string, cursor string) {
+		card, ok := surfaceOf[*uidialogs.MoveSurface](m)
+		if !ok {
+			t.Fatalf("no move card, status %q", m.errBar.text)
+		}
+		for _, option := range card.Picker().Groups {
+			paths = append(paths, option.Path)
+		}
+		return paths, card.Picker().GroupPath()
+	}
+	press := func(msg tea.KeyMsg) {
+		_, cmd := m.Update(msg)
+		m.runRemoteCmd(t, cmd)
+	}
+
+	// The host refuses an archived group, so the card offers none but the
+	// agent's own.
+	m.runRailIntent(uirail.Intent{Kind: uirail.MoveToGroup, Target: boxSession("s1")})
+	if paths, cursor := picked(); !slices.Equal(paths, []string{"", "web", "ops", "ops/db"}) || cursor != "web" {
+		t.Fatalf("targets %q on %q, want the host's open groups on web", paths, cursor)
+	}
+	press(tea.KeyMsg{Type: tea.KeyEnter})
+	if calls := fake.taken(); moveOpen(m) || len(calls) != 0 {
+		t.Fatalf("enter on its own group: open %v, calls %q", moveOpen(m), calls)
+	}
+
+	m.runRailIntent(uirail.Intent{Kind: uirail.MoveToGroup, Target: boxSession("s1")})
+	press(tea.KeyMsg{Type: tea.KeyDown})
+	press(tea.KeyMsg{Type: tea.KeyEnter})
+	if calls := fake.taken(); moveOpen(m) || len(calls) == 0 || !slices.Equal(calls[0], []string{"move", "--json", "--", "s1", "ops"}) {
+		t.Fatalf("calls = %q, want the move to ops first", calls)
+	}
+	if m.errBar.text != "moved api to ops on box" {
+		t.Fatalf("status = %q", m.errBar.text)
+	}
+
+	// An archived agent in an archived group opens on its own group, and
+	// enter leaves it there, as the local card does.
+	fake.mu.Lock()
+	fake.calls = nil
+	fake.mu.Unlock()
+	m.clearErr()
+	m.runRailIntent(uirail.Intent{Kind: uirail.MoveToGroup, Target: uirail.Selection{Kind: uirail.SessionRow, SessionID: "s4", Group: "shelf/inner", Host: "box"}})
+	if paths, cursor := picked(); !slices.Equal(paths, []string{"", "web", "ops", "ops/db", "shelf", "shelf/inner"}) || cursor != "shelf/inner" {
+		t.Fatalf("targets %q on %q, want its own archived group kept and selected", paths, cursor)
+	}
+	press(tea.KeyMsg{Type: tea.KeyEnter})
+	if calls := fake.taken(); moveOpen(m) || len(calls) != 0 || m.errBar.text != "" {
+		t.Fatalf("enter on its own archived group: open %v, calls %q, status %q", moveOpen(m), calls, m.errBar.text)
 	}
 }
 
@@ -171,12 +243,15 @@ func TestOfflineHostRefusesCallsWithItsError(t *testing.T) {
 	state := hostState(m, "box")
 	state.OK, state.Failures, state.Attempted, state.Err = false, 1, time.Now(), "box: unreachable over SSH: connection refused"
 	setHost(m, "box", state)
-	_, cmd := m.runRailIntent(uirail.Intent{Kind: uirail.Kill, Target: boxSession("s1")})
-	if cmd != nil || !m.remoteIdle() || len(fake.taken()) != 0 {
-		t.Fatal("a call to an offline host went out")
-	}
-	if m.errBar.text != "box: unreachable over SSH: connection refused" {
-		t.Fatalf("status = %q", m.errBar.text)
+	for name, kind := range map[string]uirail.ActionKind{"kill": uirail.Kill, "move": uirail.MoveToGroup} {
+		m.clearErr()
+		_, cmd := m.runRailIntent(uirail.Intent{Kind: kind, Target: boxSession("s1")})
+		if cmd != nil || !m.remoteIdle() || len(fake.taken()) != 0 || moveOpen(m) {
+			t.Fatalf("%s on an offline host went out or opened a card", name)
+		}
+		if m.errBar.text != "box: unreachable over SSH: connection refused" {
+			t.Fatalf("%s: status = %q", name, m.errBar.text)
+		}
 	}
 }
 
