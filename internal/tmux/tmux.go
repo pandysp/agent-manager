@@ -36,6 +36,10 @@ const pinnedPrefixOption = "@am_pinned_prefix"
 // keys the manager bound, so the next run can take them off.
 const rootKeysOption = "@am_root_keys"
 
+// promptHeadOption is the global user option that reads 1 while the server
+// binds ← in attached sessions.
+const promptHeadOption = "@am_prompt_head"
+
 const (
 	RequestReview = "review"
 	RequestEditor = "editor"
@@ -50,10 +54,25 @@ type Driver struct {
 	paneThemePush     sync.Mutex
 	socketPath        atomic.Pointer[string]
 	sessionKeys       atomic.Pointer[keybind.Table]
+	promptHead        atomic.Pointer[string]
 }
 
 func (d *Driver) SetSessionKeys(keys keybind.Table) {
 	d.sessionKeys.Store(&keys)
+}
+
+// SetPromptHeadCheck names the shell command an attached ← runs to ask
+// whether the caret sits at the head of the agent's prompt. Empty leaves ←
+// to the agent.
+func (d *Driver) SetPromptHeadCheck(command string) {
+	d.promptHead.Store(&command)
+}
+
+func (d *Driver) promptHeadCheck() string {
+	if command := d.promptHead.Load(); command != nil {
+		return *command
+	}
+	return ""
 }
 
 func (d *Driver) currentSessionKeys() keybind.Table {

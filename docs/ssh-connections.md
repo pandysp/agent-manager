@@ -76,11 +76,11 @@ The local machine can be Linux, macOS or Windows. The remote host must be Linux 
 ## Not in scope
 
 These are refused on a remote row with a message naming the gap:
-- Move, deleting a group, restart and fork.
+- Moving or deleting a group, moving or nesting a terminal, restart and fork.
 - Diff review.
 - The editor.
 - Copying a reply, marking idle, cancelling an after-turn end, reordering.
 - Kill all and revive all.
 - File reservations and tasks, which stay per host.
 
-Focus and attach on a remote row open an SSH attach in the terminal, not the embedded focus view. Inside it, the host's review and editor keys detach like its back key does, and the manager says they work only for sessions on this machine. The host's own manager never sees the request, since the attach takes it back off that host's tmux server.
+Focus and attach on a remote row open an SSH attach in the terminal, not the embedded focus view. Inside it, `←` belongs to the agent by default. Set the host's ←→ setting to `attach` (`agent-manager settings set arrow_step_keys attach` on the host) and `←` at the start of the agent's prompt goes back to the list as it does on this machine. The host's sessions pick the change up when the manager next starts on the host, or when a session is next created there from a shell or by an agent. The host's review and editor keys detach like its back key does, and the manager says they work only for sessions on this machine. The host's own manager never sees the request, since the attach takes it back off that host's tmux server.

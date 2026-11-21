@@ -42,6 +42,18 @@ func (d *Driver) Display(id, format string) (string, error) {
 	return d.run("display-message", "-p", "-t", PaneTarget(id), format)
 }
 
+// DisplayAndCapture expands format against the agent's pane and captures
+// it in one command list, which tmux runs with no pane output in between,
+// so both describe the same frame.
+func (d *Driver) DisplayAndCapture(id, format string) (expanded, pane string, err error) {
+	out, err := d.run(commandList(
+		[]string{"display-message", "-p", "-t", PaneTarget(id), format},
+		[]string{"capture-pane", "-p", "-e", "-t", PaneTarget(id)},
+	)...)
+	expanded, pane, _ = strings.Cut(out, "\n")
+	return expanded, pane, err
+}
+
 // DisplayContext is Display bounded by ctx.
 func (d *Driver) DisplayContext(ctx context.Context, id, format string) (string, error) {
 	return d.runContext(ctx, "display-message", "-p", "-t", PaneTarget(id), format)

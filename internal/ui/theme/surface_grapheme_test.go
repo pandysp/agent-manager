@@ -28,3 +28,29 @@ func TestFillBackdropKeycapWidth(t *testing.T) {
 		})
 	}
 }
+
+func TestFillBackdropClearsOnlyRowsTerminalsSizeDifferently(t *testing.T) {
+	const width = 10
+	tests := []struct {
+		name, line string
+		clears     bool
+	}{
+		{"plain ASCII", "abc", false},
+		{"styled text", "\x1b[1;31mhello\x1b[0m world", false},
+		{"wide CJK", "示例", false},
+		{"combining mark", "ábc", false},
+		{"keycap", "1️⃣" + strings.Repeat("x", 8), true},
+		{"emoji presentation selector", "⚠️ warn", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FillBackdrop(tt.line, width, "#000000", "#ffffff")
+			if clears := strings.Contains(got, ansi.EraseEntireLine); clears != tt.clears {
+				t.Fatalf("row clears = %v, want %v: %q", clears, tt.clears, got)
+			}
+			if before, _, found := strings.Cut(got, ansi.EraseEntireLine); found && ansi.Strip(before) != "" {
+				t.Fatalf("row clears after painting %q: %q", ansi.Strip(before), got)
+			}
+		})
+	}
+}

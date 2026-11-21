@@ -199,6 +199,9 @@ func (m *Model) action(action string, ctx KeyContext) Decision {
 			}
 			return Decision{Consumed: true}
 		}
+		if ctx.StepInAttaches {
+			return m.intent(Attach)
+		}
 		return m.intent(Focus)
 	case keybind.StepOut:
 		if !ctx.ArrowStep {

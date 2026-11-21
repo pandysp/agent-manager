@@ -98,8 +98,8 @@ func (d *Driver) styleStatusBar(name string) error {
 		{"set-option", "-t", name, "status", "on"},
 		// The default status-right-length of 40 truncates the hints, so widen it
 		// to fit the whole footer, including the configured-prefix fallback.
-		{"set-option", "-t", name, "status-right-length", "100"},
-		{"set-option", "-t", name, "status-right", attachStatusRight(primary, secondary, d.currentSessionKeys())},
+		{"set-option", "-t", name, "status-right-length", "120"},
+		{"set-option", "-t", name, "status-right", attachStatusRight(primary, secondary, d.currentSessionKeys()) + promptHeadHint},
 		{"set-option", "-t", name, "status-style", "bg=colour236,fg=colour249"},
 		// hide the "0:windowname*" window list; it reads as noise here
 		{"set-option", "-t", name, "window-status-format", hiddenWindowStatus},
@@ -198,6 +198,7 @@ func (d *Driver) ensureBindingsIn(id string) error {
 	bind(keys.Binding(keybind.Detach), []string{"detach-client"})
 	bind(keys.Binding(keybind.Review), d.requestAction(id, RequestReview))
 	bind(keys.Binding(keybind.Editor), d.requestAction(id, RequestEditor))
+	commands = append(commands, promptHeadBinding(d.promptHeadCheck())...)
 	commands = append(commands, recordRootBindings(bound)...)
 	// Restore the standard fallback when the prefix shadows a direct binding.
 	commands = append(commands, []string{"bind-key", "-T", "prefix", "d", bindingArg("detach-client")})

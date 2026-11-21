@@ -262,12 +262,13 @@ func (m *Model) railLines(width, height int) []contentLine {
 
 func (m *Model) railLegendContext() uirail.LegendContext {
 	return uirail.LegendContext{
-		GlyphMode:     m.prefs.glyphMode,
-		ListKeys:      m.services.listKeys,
-		EnterFocuses:  m.enterFocuses(),
-		MouseDisabled: m.prefs.mouseDisabled,
-		ArrowStep:     m.prefs.arrowStep,
-		FullLayout:    m.prefs.fullLayout,
+		GlyphMode:      m.prefs.glyphMode,
+		ListKeys:       m.services.listKeys,
+		EnterFocuses:   m.enterFocuses(),
+		MouseDisabled:  m.prefs.mouseDisabled,
+		ArrowStep:      m.prefs.arrowStep,
+		StepInAttaches: m.prefs.arrowAttach,
+		FullLayout:     m.prefs.fullLayout,
 	}
 }
 

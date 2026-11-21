@@ -63,5 +63,5 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) railKeyContext() uirail.KeyContext {
-	return uirail.KeyContext{ListKeys: m.services.listKeys, ArrowStep: m.prefs.arrowStep, EnterFocuses: m.enterFocuses()}
+	return uirail.KeyContext{ListKeys: m.services.listKeys, ArrowStep: m.prefs.arrowStep, StepInAttaches: m.prefs.arrowAttach, EnterFocuses: m.enterFocuses()}
 }
