@@ -65,7 +65,7 @@ func (m *Model) bindEffect(request uieffects.Request) func() (uieffects.Result, 
 		}),
 		uieffects.Binder(func() uipersist.Services {
 			services := capture()
-			return uipersist.Services{Writer: uipersist.StoreWriter{Store: services.store}, Keys: services.keySaver(), Presets: services.store}
+			return uipersist.Services{Writer: uipersist.StoreWriter{Store: services.store}, Keys: services.keySaver(), Presets: services.store, Rebind: services.rebindSessions}
 		}),
 		uieffects.Binder[uinotices.Services](m.noticesServices),
 		uieffects.Binder(func() onboardingruntime.Services { return onboardingruntime.Services{} }),

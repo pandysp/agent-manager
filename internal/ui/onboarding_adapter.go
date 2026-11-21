@@ -188,7 +188,7 @@ func (m *Model) setupKeys() uionboarding.Keys {
 		Messages:   first(list, keybind.Messages),
 		Help:       first(list, keybind.Help),
 	}
-	if !m.prefs.arrowStep || keys.Focus == "" || keys.Back == "" {
+	if !m.prefs.arrowStep || m.prefs.arrowAttach || keys.Focus == "" || keys.Back == "" {
 		keys.Focus, keys.Back, keys.OtherFocus, keys.OtherBack = enter, detach, "", ""
 	}
 	return keys

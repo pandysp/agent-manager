@@ -3,6 +3,7 @@ package ui
 import (
 	"github.com/YoanWai/agent-manager/internal/config"
 	"github.com/YoanWai/agent-manager/internal/keybind"
+	"github.com/YoanWai/agent-manager/internal/sessioncmd"
 	"github.com/YoanWai/agent-manager/internal/store"
 	"github.com/YoanWai/agent-manager/internal/systheme"
 	uieffects "github.com/YoanWai/agent-manager/internal/ui/effects"
@@ -251,6 +252,7 @@ func (m *Model) reconcileSettingsPrefs(restored []uisettings.Readback) string {
 func (m *Model) applySettingsPrefs(d *uisettings.State) {
 	m.prefs.glyphMode = d.GlyphMode
 	m.services.editor = d.Editor.Line()
+	m.mirrorArrowStep(d.ArrowStep)
 	for _, key := range uisettings.FlagKeys() {
 		m.mirrorFlag(key, d.Flag(key))
 	}
@@ -349,7 +351,23 @@ func (m *Model) mirrorPreference(key, value string) {
 		m.services.editor = mirrored.Editor
 	case key == uisettings.GlyphModeSetting:
 		m.prefs.glyphMode = mirrored.GlyphMode
+	case key == uisettings.ArrowStepSetting:
+		m.mirrorArrowStep(mirrored.ArrowStep)
 	}
+}
+
+func (m *Model) mirrorArrowStep(step string) {
+	m.prefs.arrowStep = step != uisettings.ArrowStepOff
+	m.prefs.arrowAttach = step == uisettings.ArrowStepAttach
+}
+
+// rebindSessions installs the in-session bindings again from the stored
+// settings, since the ←→ attach value is what binds ← there.
+func (s effectServices) rebindSessions() error {
+	if err := sessioncmd.ApplyBindingSettings(s.store, s.driver); err != nil {
+		return err
+	}
+	return s.driver.EnsureBindings()
 }
 
 // mirrorFlag is the one place a two-way row meets its preferences field.
@@ -357,8 +375,6 @@ func (m *Model) mirrorFlag(key string, on bool) {
 	switch key {
 	case uisettings.FocusKeySetting:
 		m.prefs.focusOnEnter = on
-	case uisettings.ArrowStepSetting:
-		m.prefs.arrowStep = on
 	case uisettings.ListDensitySetting:
 		m.prefs.comfortableRows = on
 	case uisettings.SessionLayoutSetting:

@@ -18,6 +18,7 @@ import (
 	focusruntime "github.com/YoanWai/agent-manager/internal/ui/focus/runtime"
 	uipreview "github.com/YoanWai/agent-manager/internal/ui/preview"
 	uicapture "github.com/YoanWai/agent-manager/internal/ui/preview/capture"
+	uilifecycle "github.com/YoanWai/agent-manager/internal/ui/session/lifecycle"
 	uisettings "github.com/YoanWai/agent-manager/internal/ui/settings"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -1330,14 +1331,14 @@ func TestArrowStepSettingDisablesThePair(t *testing.T) {
 
 	m.openSettings()
 	m.settingsCard().State().Field = uisettings.FieldArrowStep
-	m.cycleSetting(1)
+	m.cycleSetting(-1)
 	m.handleSettingsKey(tea.KeyMsg{Type: tea.KeyEnter})
 	m.drainEffects(t)
 	if chosen, err := m.services.store.Setting(uisettings.ArrowStepSetting); err != nil || chosen != "off" {
 		t.Fatalf("toggle did not persist, chosen = %q, err = %v", chosen, err)
 	}
-	if storedFlag(t, m, uisettings.ArrowStepSetting) {
-		t.Fatal("storedArrowStep still reads on")
+	if m.prefs.arrowStep || m.prefs.arrowAttach {
+		t.Fatalf("the pair still reads on, step = %v, attach = %v", m.prefs.arrowStep, m.prefs.arrowAttach)
 	}
 
 	updated, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRight})
@@ -1362,6 +1363,63 @@ func TestArrowStepSettingDisablesThePair(t *testing.T) {
 	*m = *updated.(*Model)
 	if !m.focused() {
 		t.Fatalf("left left focus with the pair off, screen = %v", m.screenID())
+	}
+}
+
+// The setting's attach value has → attach full screen, and the save puts
+// the ← binding on the session's tmux server. Stepping back to the focus
+// default takes the binding off again, so attached sessions keep ←.
+func TestArrowStepSettingAttachBindsLeftInTheSession(t *testing.T) {
+	m := buildModel(t)
+	createSession(t, m, "optin", t.TempDir(), "")
+	m.selectSessionRow(t, "optin")
+	sess := railSelectedSession(m)
+	leftBound := func() bool {
+		keys, err := sessionTmuxCmd(t, sess.ID, "list-keys", "-T", "root").CombinedOutput()
+		if err != nil {
+			t.Fatalf("list-keys: %v: %s", err, keys)
+		}
+		for _, line := range strings.Split(string(keys), "\n") {
+			if fields := strings.Fields(line); len(fields) > 3 && fields[3] == "Left" {
+				return true
+			}
+		}
+		return false
+	}
+	save := func(step int, want string) {
+		t.Helper()
+		m.openSettings()
+		m.settingsCard().State().Field = uisettings.FieldArrowStep
+		m.cycleSetting(step)
+		m.handleSettingsKey(tea.KeyMsg{Type: tea.KeyEnter})
+		m.drainEffects(t)
+		if chosen, err := m.services.store.Setting(uisettings.ArrowStepSetting); err != nil || chosen != want {
+			t.Fatalf("the row did not persist, chosen = %q, err = %v", chosen, err)
+		}
+	}
+	if leftBound() {
+		t.Fatal("the focus default bound ← in the session")
+	}
+
+	save(1, "attach")
+	if !m.prefs.arrowStep || !m.prefs.arrowAttach {
+		t.Fatalf("attach did not reach the list, step = %v, attach = %v", m.prefs.arrowStep, m.prefs.arrowAttach)
+	}
+	if leftBound() != (runtime.GOOS != "windows") {
+		t.Fatalf("after saving attach, ← bound = %v", leftBound())
+	}
+	updated, attach := m.handleKey(tea.KeyMsg{Type: tea.KeyRight})
+	*m = *updated.(*Model)
+	if request, attaching := m.effects.Main.Active.Request.(uilifecycle.AttachRequest); !attaching || request.ID != sess.ID {
+		t.Fatalf("→ queued %+v, want an attach to %s", m.effects.Main.Active.Request, sess.ID)
+	}
+	if m.foregroundTestCmd(t, attach) == nil || m.focused() {
+		t.Fatalf("→ did not open an attach, focused = %v, err = %q", m.focused(), m.errBar.text)
+	}
+
+	save(-1, "on")
+	if leftBound() {
+		t.Fatal("going back to focus left ← bound in the session")
 	}
 }
 

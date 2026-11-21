@@ -156,6 +156,14 @@ func subcommands() map[string]func(args []string) error {
 		"follow-telemetry": withConfigDir(func(args []string, _ func() string, configDir string) error {
 			return sessioncmd.FollowTelemetry(configDir, args)
 		}),
+		// An attached ← runs this on every press and reads its exit status.
+		sessioncmd.PromptHeadCommand: withConfigDir(func(args []string, _ func() string, configDir string) error {
+			driver, err := tmux.New()
+			if err != nil {
+				return err
+			}
+			return app.PromptHead(configDir, driver, args)
+		}),
 	}
 	for name := range cli.Commands(version, ui.SettingSpecs) {
 		table[name] = withConfigDir(func(args []string, caller func() string, configDir string) error {

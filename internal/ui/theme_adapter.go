@@ -152,6 +152,8 @@ type preferences struct {
 	// arrowStep mirrors the persisted ←→ step-in/step-out setting, read
 	// on every keypress.
 	arrowStep bool
+	// arrowAttach is that setting's "attach" value.
+	arrowAttach bool
 	// comfortableRows mirrors the persisted list density: entries paint
 	// their meta on a second line instead of alongside the name. Every
 	// rail frame reads it, so it lives here instead of the store.

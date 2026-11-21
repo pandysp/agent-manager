@@ -5,9 +5,10 @@ A fixture `ssh` first on PATH drops every argument but the remote command and
 runs it with /bin/sh under a second disposable profile, so the manager talks
 to a real agent-manager "host" without a network or the user's ~/.ssh. The
 scenario adds a connection through the dialog and drives every action a
-remote row offers: preview, quick send, kill, revive, archive, restore,
-delete, attach, quick spawn, a new terminal, and deleting a group with its agent. A second connection whose host
-refuses shows as unreachable and is removed. Every process it started is ended by PID.
+remote row offers: preview, rename, quick send, move, kill, revive, archive,
+restore, delete, attach, quick spawn, a new terminal, and deleting a group with
+its agent. A second connection whose host refuses shows as unreachable and is
+removed. Every process it started is ended by PID.
 """
 import argparse
 import hashlib
@@ -32,6 +33,8 @@ from smoke import Sandbox
 CONNECTION = 'box'
 DOWN = 'down'
 REMOTE_AGENT = 'remote-agent'
+RENAMED_AGENT = 'renamed-agent'
+RENAMED_GROUP = 'frontend'
 REMOTE_GROUP = 'web'
 GROUPED_AGENT = 'api'
 REMOTE_NEW_GROUP = 'ops'
@@ -40,6 +43,9 @@ LATE_AGENT = 'ops-late'
 SWAP_AGENT = 'ops-swap'
 QUICK_TEXT = 'ssh-quick-input'
 SPAWN_TEXT = 'ssh-spawn-prompt'
+# command-code's prompt marker, the composer an attached ← reads.
+COMPOSER = '❯ '
+LEFT_ECHO = 'agent-got-left'
 
 
 def fake_ssh_script(remote_env):
@@ -51,6 +57,52 @@ def fake_ssh_script(remote_env):
         'esac\n'
         'for last; do :; done\n'
             f'exec env -i PATH="$PATH" {exports} /bin/sh -c "$last"\n')
+
+
+COMPOSER_AGENT = r"""
+import os, sys, termios, tty
+if sys.argv[1:2] == ['mcp']:
+    sys.exit(0)
+out = sys.stdout
+out.write(READY + '\n')
+tty.setraw(0)
+draft, lefts, pending = '', 0, b''
+def draw(back=0):
+    out.write('\r\033[K' + COMPOSER + draft + '\033[D' * back)
+    out.flush()
+draw()
+while True:
+    byte = os.read(0, 1)
+    if not byte:
+        break
+    pending += byte
+    if pending == b'\033[D':
+        lefts += 1
+        out.write('\r\033[K%s %d\r\n' % (LEFT_ECHO, lefts))
+        draw(back=1)
+    elif b'\033'.startswith(pending) or b'\033['.startswith(pending):
+        continue
+    elif pending == b'\x7f':
+        draft = draft[:-1]
+        draw()
+    elif pending == b'\r':
+        draft = ''
+        out.write('\r\n')
+        draw()
+    elif pending.isascii() and pending.decode().isprintable():
+        draft += pending.decode()
+        draw()
+    pending = b''
+"""
+
+
+def composer_cli_script():
+    """The remote agent: command-code's composer, "❯ " with the caret after
+    the draft. Typed text joins the draft, backspace takes it back, and each
+    ← it receives is counted on screen, so a ← that never reached it shows."""
+    agent = (f'READY, COMPOSER, LEFT_ECHO = {READY_MARKER!r}, {COMPOSER!r}, {LEFT_ECHO!r}\n'
+             + COMPOSER_AGENT)
+    return '#!/bin/sh\n# disposable fixture agent CLI; never a real install\nexec python3 -I -c ' + shlex.quote(agent) + ' "$@"\n'
 
 
 def remote_shell_script(bin_dir):
@@ -125,7 +177,7 @@ def write_fixtures(sandbox, remote, binary):
     # A copy at a path unique to this run, so its processes are found by PID.
     manager = bin_dir / 'agent-manager'
     shutil.copy2(binary, manager)
-    (bin_dir / FAKE_BIN).write_text(fake_cli_script(READY_MARKER))
+    (bin_dir / FAKE_BIN).write_text(composer_cli_script())
     (bin_dir / 'ssh').write_text(fake_ssh_script(remote.env))
     shell = remote.home / 'login-shell'
     shell.write_text(remote_shell_script(bin_dir))
@@ -146,6 +198,8 @@ def seed_remote(sandbox, remote, manager):
     """The host's own fleet: an agent in its root and one in a group."""
     workdir = remote.home / 'work'
     workdir.mkdir()
+    # The host opts in to ← coming back from an attach before it has sessions.
+    remote.run(sandbox, [str(manager), 'settings', 'set', 'arrow_step_keys', 'attach'])
     remote.run(sandbox, [str(manager), 'create-group', '--json', '--', REMOTE_GROUP])
     for name, group in ((REMOTE_AGENT, ''), (GROUPED_AGENT, REMOTE_GROUP)):
         remote.run(sandbox, [str(manager), 'spawn', '--json', '--name=' + name, '--tool=' + FAKE_CLI,
@@ -230,6 +284,38 @@ def confirm(sandbox, name, question, done):
     frame(sandbox, name + '-done', done)
 
 
+def rename(sandbox, remote, agent_id):
+    """r types the new name into the row and the host renames the agent, which goes back to its old name
+    for the steps after, then the group the other agent is filed in."""
+    agent = f"SELECT name FROM sessions WHERE id = '{agent_id}'"
+    grouped = f"SELECT group_name FROM sessions WHERE name = '{GROUPED_AGENT}'"
+    for name, needle, before, after, done, query in (
+            ('remote-rename', f'{REMOTE_AGENT}  on {CONNECTION}', REMOTE_AGENT, RENAMED_AGENT, '', agent),
+            ('remote-rename-back', f'{RENAMED_AGENT}  on {CONNECTION}', RENAMED_AGENT, REMOTE_AGENT, '', agent),
+            ('remote-group-rename', f'{REMOTE_GROUP}  on {CONNECTION}', REMOTE_GROUP, RENAMED_GROUP, 'group ', grouped)):
+        select(sandbox, name, needle)
+        key(sandbox, 'r')
+        frame(sandbox, name + '-field', 'Rename')
+        key(sandbox, 'C-u')
+        sandbox.tmux('send-keys', '-l', '-t', 'scen:0.0', after)
+        key(sandbox, 'Enter')
+        frame(sandbox, name + '-done', f'renamed {done}{before} to {after} on {CONNECTION}')
+        sandbox.wait(name + '-stored', lambda query=query: str(remote.query(query)),
+                     lambda value, after=after: value == str([(after,)]))
+
+
+def move(sandbox, remote):
+    """m on a remote agent picks among the host's groups, and the host files it there."""
+    select(sandbox, 'grouped-agent', f'{GROUPED_AGENT}  on {CONNECTION}')
+    key(sandbox, 'm')
+    frame(sandbox, 'remote-move', 'Move')
+    key(sandbox, 'Up')
+    key(sandbox, 'Enter')
+    frame(sandbox, 'remote-moved', f'moved {GROUPED_AGENT} to root on {CONNECTION}')
+    sandbox.wait('remote-move-landed', lambda: str(remote.query(f"SELECT group_name FROM sessions WHERE name = '{GROUPED_AGENT}'")),
+                 lambda value: value == "[('',)]")
+
+
 def lifecycle(sandbox, remote, agent_id):
     """Kill, revive, archive and restore, each confirmed, each landing on the host."""
     key(sandbox, 'x')
@@ -280,6 +366,34 @@ def attach(sandbox, remote, agent_id):
     frame(sandbox, 'remote-attached', READY_MARKER, 'A G E N T')
     key(sandbox, 'C-q')
     frame(sandbox, 'remote-detached', f'{REMOTE_AGENT}  on {CONNECTION}')
+
+
+def left_at_prompt_head(sandbox, remote, agent_id):
+    """Issue 850: focus on a remote row opens an attach. With the host's ←→
+    setting on attach, ← reaches the agent while a draft sits before the caret
+    and, at the head of the prompt, goes back to the list the way it does in
+    a session on this machine."""
+    pane = 'am_' + agent_id
+    select_remote_agent(sandbox)
+    key(sandbox, 'Enter')
+    frame(sandbox, 'left-attached', READY_MARKER, 'A G E N T')
+    frame(sandbox, 'left-footer', '← prompt start = back')
+    sandbox.tmux('send-keys', '-l', '-t', 'scen:0.0', 'ab')
+    sandbox.wait('left-draft', lambda: remote.tmux(sandbox, 'capture-pane', '-p', '-t', pane).stdout,
+                 lambda text: COMPOSER + 'ab' in text)
+    key(sandbox, 'Left')
+    sandbox.wait('left-reached-agent', lambda: remote.tmux(sandbox, 'capture-pane', '-p', '-t', pane).stdout,
+                 lambda text: LEFT_ECHO + ' 1' in text)
+    frame(sandbox, 'left-still-attached', LEFT_ECHO + ' 1', 'A G E N T')
+    key(sandbox, 'BSpace')
+    key(sandbox, 'BSpace')
+    sandbox.wait('left-composer-empty', lambda: remote.tmux(sandbox, 'capture-pane', '-p', '-t', pane).stdout,
+                 lambda text: text.rstrip().endswith(COMPOSER.strip()))
+    key(sandbox, 'Left')
+    frame(sandbox, 'left-at-head', f'{REMOTE_AGENT}  on {CONNECTION}')
+    after = remote.tmux(sandbox, 'capture-pane', '-p', '-t', pane)
+    if after.returncode != 0 or LEFT_ECHO + ' 2' in after.stdout:
+        raise AssertionError(f'← at the head of the prompt reached the agent, or its pane is gone: {after.stdout}{after.stderr}')
 
 
 def spawn_and_terminal(sandbox, remote):
@@ -399,8 +513,8 @@ def scenario(sandbox, remote, binary):
 
     select_remote_agent(sandbox)
     frame(sandbox, 'remote-preview', READY_MARKER)
-    key(sandbox, 'r')
-    frame(sandbox, 'remote-refusal', "rename isn't available on SSH connections yet")
+    rename(sandbox, remote, agent_id)
+    select_remote_agent(sandbox)
     key(sandbox, 'Space')
     sandbox.tmux('send-keys', '-l', '-t', 'scen:0.0', QUICK_TEXT)
     frame(sandbox, 'quick-typed', QUICK_TEXT)
@@ -417,8 +531,11 @@ def scenario(sandbox, remote, binary):
 
     key(sandbox, 'Escape')
     frame(sandbox, 'quick-closed', f'{REMOTE_AGENT}  on {CONNECTION}', 'Quick prompt mode')
+    move(sandbox, remote)
+    select_remote_agent(sandbox)
     lifecycle(sandbox, remote, agent_id)
     attach(sandbox, remote, agent_id)
+    left_at_prompt_head(sandbox, remote, agent_id)
     spawn_and_terminal(sandbox, remote)
     delete_group(sandbox, remote, manager)
     offline_connection(sandbox)

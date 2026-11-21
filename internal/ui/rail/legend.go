@@ -29,18 +29,19 @@ type Legend struct {
 // Session is filled for session rows. Unread is the messages alert, empty
 // when nothing is unread.
 type LegendContext struct {
-	GlyphMode     presentation.GlyphMode
-	ListKeys      keybind.Table
-	EnterFocuses  bool
-	MouseDisabled bool
-	ArrowStep     bool
-	FullLayout    bool
-	Row           Selection
-	RowOK         bool
-	Session       Session
-	Widest        bool
-	Unread        [2]string
-	Messages      [2]string
+	GlyphMode      presentation.GlyphMode
+	ListKeys       keybind.Table
+	EnterFocuses   bool
+	MouseDisabled  bool
+	ArrowStep      bool
+	StepInAttaches bool
+	FullLayout     bool
+	Row            Selection
+	RowOK          bool
+	Session        Session
+	Widest         bool
+	Unread         [2]string
+	Messages       [2]string
 }
 
 // RowLegend is the tier for the entry under the cursor: what this session or
@@ -109,7 +110,11 @@ func (m Model) RowLegend(ctx LegendContext) Legend {
 		pairs = append(pairs, [2]string{gesture, "focus"})
 	}
 	if ctx.ArrowStep {
-		pairs = append(pairs, [2]string{k(keybind.StepIn), "focus"})
+		stepIn := "focus"
+		if ctx.StepInAttaches {
+			stepIn = "attach"
+		}
+		pairs = append(pairs, [2]string{k(keybind.StepIn), stepIn})
 	}
 	if (session.Status == "finished" || session.Status == "waiting") && !session.Archived {
 		pairs = append(pairs, [2]string{k(keybind.MarkIdle), "mark idle"})
@@ -281,7 +286,7 @@ func (m Model) RemoteLegend(ctx LegendContext, row RemoteRow, collapsed bool) Le
 			{k(keybind.Open), fold}, {k(keybind.Terminal), "terminal"}, {k(keybind.NewGroup), "group"}, {k(keybind.Rename), "edit"}, {k(keybind.Delete), "remove"},
 		})}
 	case GroupRow:
-		pairs := [][2]string{{k(keybind.Open), fold}, {k(keybind.Terminal), "terminal"}, {k(keybind.NewGroup), "group"}}
+		pairs := [][2]string{{k(keybind.Open), fold}, {k(keybind.Terminal), "terminal"}, {k(keybind.NewGroup), "group"}, {k(keybind.Rename), "rename"}}
 		if !m.showArchived {
 			pairs = append(pairs, [2]string{k(keybind.Delete), "delete"})
 		}
@@ -291,12 +296,15 @@ func (m Model) RemoteLegend(ctx LegendContext, row RemoteRow, collapsed bool) Le
 	if row.Terminal {
 		title, kill, leads = "Shell", "close", nil
 	}
-	pairs := [][2]string{{k(keybind.Open, keybind.Attach), "attach over SSH"}, {k(keybind.Kill), kill}}
+	pairs := [][2]string{{k(keybind.Open, keybind.Attach), "attach over SSH"}, {k(keybind.Kill), kill}, {k(keybind.Rename), "rename"}}
 	if !row.Terminal {
 		pairs = append(pairs, [2]string{k(keybind.Delete), "delete"})
 	}
 	if row.Dead {
 		pairs = append(pairs, [2]string{k(keybind.Revive), "revive"})
+	}
+	if !row.Terminal {
+		pairs = append(pairs, [2]string{k(keybind.Move), "move"})
 	}
 	pairs = append(pairs, m.archiveRestoreLegend(ctx))
 	return Legend{Title: title + " on " + row.Host, Leads: leads, Pairs: boundPairs(pairs)}
