@@ -9,9 +9,6 @@ import (
 	"time"
 )
 
-// An agent that changes directory mid-session, as Claude Code's /cd and
-// EnterWorktree do, is a child of the launch script, and tmux reports the
-// directory of the pane's foreground process group.
 func TestParsePanesKeepsPathSpacesButNotLineEndings(t *testing.T) {
 	for _, eol := range []string{"\n", "\r\n"} {
 		out := "am_live 0 123 80 24 1 0 /dev/tty /work dir " + eol +
@@ -25,6 +22,9 @@ func TestParsePanesKeepsPathSpacesButNotLineEndings(t *testing.T) {
 	}
 }
 
+// An agent that changes directory mid-session, as Claude Code's /cd and
+// EnterWorktree do, is a child of the launch script, and tmux reports the
+// directory of the pane's foreground process group.
 func TestPanesFollowsTheAgentIntoANewDirectory(t *testing.T) {
 	testenv.SkipPOSIXShell(t)
 	driver := requireTmux(t)
